@@ -24,6 +24,8 @@ export default function FoglalasPage() {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
   useEffect(() => {
     supabase.from('salons').select('id').eq('slug', slug).single().then(({ data }) => {
       if (!data) return
@@ -32,6 +34,22 @@ export default function FoglalasPage() {
       supabase.from('staff').select('*').eq('salon_id', data.id).eq('is_active', true).order('name').then(({ data: st }) => setStaff(st || []))
     })
   }, [slug])
+
+  useEffect(() => {
+    if (step !== 'datetime' || !date || !salonId || !sel) return
+    setSlotsLoading(true)
+    setTime('')
+    const params = new URLSearchParams({
+      salon_id: salonId,
+      date,
+      duration: sel.duration_min.toString(),
+      ...(selStaff ? { staff_id: selStaff.id } : {})
+    })
+    fetch(`/api/slots?${params}`)
+      .then(r => r.json())
+      .then(data => setAvailableSlots(data.slots || []))
+      .finally(() => setSlotsLoading(false))
+  }, [date, step, salonId, sel, selStaff])
   const book = async () => {
     if (!sel || !date || !time) return
     setLoading(true)
@@ -117,19 +135,55 @@ export default function FoglalasPage() {
           <div>
             <h2 className="text-lg font-bold text-gray-900 mb-4">Válassz időpontot</h2>
             <div className="bg-white rounded-2xl shadow p-6 space-y-4">
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Dátum</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Időpont</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30'].map((t) => (
-                    <button key={t} onClick={() => setTime(t)} className={`py-2 rounded-lg text-sm font-medium ${time===t?'bg-indigo-600 text-white':'bg-gray-100 text-gray-700 hover:bg-indigo-50'}`}>{t}</button>
-                  ))}
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dátum</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Időpont</label>
+                {!date ? (
+                  <p className="text-sm text-gray-400 italic">Először válassz dátumot</p>
+                ) : slotsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    Szabad időpontok betöltése...
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <p className="text-sm text-red-500">Ezen a napon nincs szabad időpont.</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {availableSlots.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setTime(t)}
+                        className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                          time === t
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-indigo-50'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setStep('staff')} className="text-sm text-gray-500">← Vissza</button>
-              <button onClick={() => setStep('details')} disabled={!date||!time} className="ml-auto bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">Tovább →</button>
+              <button
+                onClick={() => setStep('details')}
+                disabled={!date || !time}
+                className="ml-auto bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Tovább →
+              </button>
             </div>
           </div>
         )}
