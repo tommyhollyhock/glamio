@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import FoglalasButton from './FoglalasButton'
 
 type Props = { params: { slug: string } }
 
@@ -57,9 +58,7 @@ export default async function SzalonPage({ params }: Props) {
           <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-6">
             <h2 className="text-lg font-bold text-gray-900 mb-2">Időpontfoglalás</h2>
             <p className="text-sm text-gray-500 mb-6">Válassz szolgáltatást és foglalj időpontot online!</p>
-            <button className="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors">
-              Időpontot foglalok
-            </button>
+            <FoglalasButton slug={params.slug} />
           </div>
         </div>
       </div>
