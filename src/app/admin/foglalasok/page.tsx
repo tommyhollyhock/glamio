@@ -41,26 +41,19 @@ export default function FoglalasokPage() {
   const supabase = createClient()
 
   const fetchBookings = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('salon_id')
-      .eq('id', user.id)
       .single()
 
-    console.log('DEBUG user:', user?.id, 'profile:', profile, 'salon_id:', profile?.salon_id)
-    if (!profile?.salon_id) return
+    if (!profile?.salon_id) {
+      setLoading(false)
+      return
+    }
 
     let query = supabase
       .from('bookings')
-      .select(`
-        id, guest_name, guest_email, guest_phone,
-        booking_date, start_time, end_time,
-        status, total_price, notes,
-        services(name), staff(name)
-      `)
+      .select('id, guest_name, guest_email, guest_phone, booking_date, start_time, end_time, status, total_price, notes, services(name), staff(name)')
       .eq('salon_id', profile.salon_id)
       .order('booking_date', { ascending: false })
       .order('start_time', { ascending: false })
@@ -69,7 +62,8 @@ export default function FoglalasokPage() {
       query = query.eq('status', filter)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    console.log('bookings:', data, 'error:', error)
     setBookings((data as unknown as Booking[]) || [])
     setLoading(false)
   }
@@ -80,7 +74,6 @@ export default function FoglalasokPage() {
 
   const updateStatus = async (id: string, newStatus: 'confirmed' | 'cancelled') => {
     setUpdating(id)
-
     const { error } = await supabase
       .from('bookings')
       .update({ status: newStatus })
@@ -104,7 +97,6 @@ export default function FoglalasokPage() {
       }
       await fetchBookings()
     }
-
     setUpdating(null)
   }
 
@@ -118,9 +110,7 @@ export default function FoglalasokPage() {
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                filter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {f === 'all' ? 'Összes' : statusLabel[f]}
@@ -136,64 +126,40 @@ export default function FoglalasokPage() {
       ) : (
         <div className="space-y-3">
           {bookings.map((booking) => (
-            <div
-              key={booking.id}
-              className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
-            >
+            <div key={booking.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="min-w-[120px] text-center bg-gray-50 rounded-lg p-3">
                 <div className="text-sm text-gray-500">
-                  {new Date(booking.booking_date).toLocaleDateString('hu-HU', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
+                  {new Date(booking.booking_date).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })}
                 </div>
-                <div className="text-lg font-bold text-gray-900">
-                  {booking.start_time?.slice(0, 5)}
-                </div>
+                <div className="text-lg font-bold text-gray-900">{booking.start_time?.slice(0, 5)}</div>
               </div>
-
               <div className="flex-1">
                 <div className="font-semibold text-gray-900">{booking.guest_name}</div>
                 <div className="text-sm text-gray-500">{booking.guest_email} · {booking.guest_phone}</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  {booking.services?.name} — {booking.staff?.name}
-                </div>
-                {booking.notes && (
-                  <div className="text-xs text-gray-400 mt-1">📝 {booking.notes}</div>
-                )}
+                <div className="text-sm text-gray-600 mt-1">{booking.services?.name} — {booking.staff?.name}</div>
+                {booking.notes && <div className="text-xs text-gray-400 mt-1">📝 {booking.notes}</div>}
               </div>
-
               <div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[booking.status]}`}>
                   {statusLabel[booking.status]}
                 </span>
               </div>
-
               <div className="flex gap-2">
                 {booking.status === 'pending' && (
                   <>
-                    <button
-                      onClick={() => updateStatus(booking.id, 'confirmed')}
-                      disabled={updating === booking.id}
-                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                    >
+                    <button onClick={() => updateStatus(booking.id, 'confirmed')} disabled={updating === booking.id}
+                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors">
                       ✓ Megerősít
                     </button>
-                    <button
-                      onClick={() => updateStatus(booking.id, 'cancelled')}
-                      disabled={updating === booking.id}
-                      className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
-                    >
+                    <button onClick={() => updateStatus(booking.id, 'cancelled')} disabled={updating === booking.id}
+                      className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors">
                       ✕ Lemond
                     </button>
                   </>
                 )}
                 {booking.status === 'confirmed' && (
-                  <button
-                    onClick={() => updateStatus(booking.id, 'cancelled')}
-                    disabled={updating === booking.id}
-                    className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
-                  >
+                  <button onClick={() => updateStatus(booking.id, 'cancelled')} disabled={updating === booking.id}
+                    className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors">
                     ✕ Lemond
                   </button>
                 )}
