@@ -10,9 +10,8 @@ type Booking = {
   guest_name: string
   guest_email: string
   guest_phone: string
-  booking_date: string
-  start_time: string
-  end_time: string
+  starts_at: string
+  ends_at: string
   status: 'pending' | 'confirmed' | 'cancelled'
   total_price: number
   notes: string | null
@@ -56,7 +55,7 @@ export default function FoglalasokPage() {
       .select('id, guest_name, guest_email, guest_phone, starts_at, ends_at, status, total_price, notes, services(name), staff(name)')
       .eq('salon_id', profile.salon_id)
       .order('starts_at', { ascending: false })
-      .order('start_time', { ascending: false })
+      .order('starts_at', { ascending: false })
 
     if (filter !== 'all') {
       query = query.eq('status', filter)
