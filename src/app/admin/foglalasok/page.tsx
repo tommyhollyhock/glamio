@@ -83,7 +83,6 @@ export default function FoglalasokPage() {
       .eq('id', id)
 
     if (!error) {
-      // Email értesítő küldése
       const booking = bookings.find(b => b.id === id)
       if (booking?.guest_email) {
         await fetch('/api/send-status', {
@@ -110,7 +109,6 @@ export default function FoglalasokPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Foglalások</h1>
 
-        {/* Filter gombok */}
         <div className="flex gap-2">
           {(['all', 'pending', 'confirmed', 'cancelled'] as const).map((f) => (
             <button
@@ -139,7 +137,6 @@ export default function FoglalasokPage() {
               key={booking.id}
               className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
             >
-              {/* Dátum/idő blokk */}
               <div className="min-w-[120px] text-center bg-gray-50 rounded-lg p-3">
                 <div className="text-sm text-gray-500">
                   {new Date(booking.booking_date).toLocaleDateString('hu-HU', {
@@ -152,7 +149,6 @@ export default function FoglalasokPage() {
                 </div>
               </div>
 
-              {/* Vendég adatok */}
               <div className="flex-1">
                 <div className="font-semibold text-gray-900">{booking.guest_name}</div>
                 <div className="text-sm text-gray-500">{booking.guest_email} · {booking.guest_phone}</div>
@@ -164,14 +160,12 @@ export default function FoglalasokPage() {
                 )}
               </div>
 
-              {/* Státusz badge */}
               <div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[booking.status]}`}>
                   {statusLabel[booking.status]}
                 </span>
               </div>
 
-              {/* Akció gombok */}
               <div className="flex gap-2">
                 {booking.status === 'pending' && (
                   <>
