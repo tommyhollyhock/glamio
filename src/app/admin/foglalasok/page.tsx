@@ -53,6 +53,7 @@ export default function FoglalasokPage() {
       .eq('id', user.id)
       .single()
 
+    console.log('DEBUG user:', user?.id, 'profile:', profile, 'salon_id:', profile?.salon_id)
     if (!profile?.salon_id) return
 
     let query = supabase
