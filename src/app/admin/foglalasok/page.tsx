@@ -53,9 +53,9 @@ export default function FoglalasokPage() {
 
     let query = supabase
       .from('bookings')
-      .select('id, guest_name, guest_email, guest_phone, booking_date, start_time, end_time, status, total_price, notes, services(name), staff(name)')
+      .select('id, guest_name, guest_email, guest_phone, starts_at, ends_at, status, total_price, notes, services(name), staff(name)')
       .eq('salon_id', profile.salon_id)
-      .order('booking_date', { ascending: false })
+      .order('starts_at', { ascending: false })
       .order('start_time', { ascending: false })
 
     if (filter !== 'all') {
@@ -89,8 +89,8 @@ export default function FoglalasokPage() {
             email: booking.guest_email,
             name: booking.guest_name,
             status: newStatus,
-            date: booking.booking_date,
-            time: booking.start_time,
+            date: booking.starts_at,
+            time: booking.starts_at,
             service: booking.services?.name,
           }),
         })
@@ -129,9 +129,9 @@ export default function FoglalasokPage() {
             <div key={booking.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="min-w-[120px] text-center bg-gray-50 rounded-lg p-3">
                 <div className="text-sm text-gray-500">
-                  {new Date(booking.booking_date).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })}
+                  {new Date(booking.starts_at).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })}
                 </div>
-                <div className="text-lg font-bold text-gray-900">{booking.start_time?.slice(0, 5)}</div>
+                <div className="text-lg font-bold text-gray-900">{booking.starts_at?.slice(0, 5)}</div>
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900">{booking.guest_name}</div>
