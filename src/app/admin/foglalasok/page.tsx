@@ -44,9 +44,13 @@ export default function FoglalasokPage() {
   )
 
   const fetchBookings = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('salon_id')
+      .eq('id', user.id)
       .single()
 
     if (!profile?.salon_id) return
