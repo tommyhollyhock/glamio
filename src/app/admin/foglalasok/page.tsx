@@ -1,204 +1,210 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 
 type Booking = {
   id: string
   guest_name: string
   guest_email: string
   guest_phone: string
-  starts_at: string
-  ends_at: string
-  status: string
+  booking_date: string
+  start_time: string
+  end_time: string
+  status: 'pending' | 'confirmed' | 'cancelled'
   total_price: number
-  notes: string
-  services: { name: string }
-  staff: { name: string }
+  notes: string | null
+  services: { name: string } | null
+  staff: { name: string } | null
 }
 
-const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  confirmed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-red-100 text-red-700',
-  completed: 'bg-blue-100 text-blue-700',
-  no_show: 'bg-gray-100 text-gray-500',
-}
-
-const statusLabels: Record<string, string> = {
+const statusLabel: Record<string, string> = {
   pending: 'Függőben',
   confirmed: 'Megerősítve',
   cancelled: 'Lemondva',
-  completed: 'Teljesítve',
-  no_show: 'Nem jelent meg',
+}
+
+const statusColor: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  confirmed: 'bg-green-100 text-green-800',
+  cancelled: 'bg-red-100 text-red-800',
 }
 
 export default function FoglalasokPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
-  const supabase = createClient()
+  const [updating, setUpdating] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all')
 
-  useEffect(() => {
-    fetchBookings()
-  }, [])
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const fetchBookings = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('salon_id')
-      .eq('id', user.id)
       .single()
 
     if (!profile?.salon_id) return
 
-    const { data } = await supabase
+    let query = supabase
       .from('bookings')
       .select(`
-        *,
-        services(name),
-        staff(name)
+        id, guest_name, guest_email, guest_phone,
+        booking_date, start_time, end_time,
+        status, total_price, notes,
+        services(name), staff(name)
       `)
       .eq('salon_id', profile.salon_id)
-      .order('starts_at', { ascending: false })
+      .order('booking_date', { ascending: false })
+      .order('start_time', { ascending: false })
 
-    setBookings(data || [])
+    if (filter !== 'all') {
+      query = query.eq('status', filter)
+    }
+
+    const { data } = await query
+    setBookings((data as unknown as Booking[]) || [])
     setLoading(false)
   }
 
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from('bookings').update({ status }).eq('id', id)
+  useEffect(() => {
     fetchBookings()
-  }
+  }, [filter])
 
-  const filtered = filter === 'all'
-    ? bookings
-    : bookings.filter((b) => b.status === filter)
+  const updateStatus = async (id: string, newStatus: 'confirmed' | 'cancelled') => {
+    setUpdating(id)
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso)
-    return d.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status: newStatus })
+      .eq('id', id)
+
+    if (!error) {
+      // Email értesítő küldése
+      const booking = bookings.find(b => b.id === id)
+      if (booking?.guest_email) {
+        await fetch('/api/send-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: booking.guest_email,
+            name: booking.guest_name,
+            status: newStatus,
+            date: booking.booking_date,
+            time: booking.start_time,
+            service: booking.services?.name,
+          }),
+        })
+      }
+      await fetchBookings()
+    }
+
+    setUpdating(null)
   }
 
   return (
-    <div className="p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Fejléc */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Foglalások</h1>
-            <p className="text-gray-500 mt-1">{bookings.length} foglalás összesen</p>
-          </div>
-        </div>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Foglalások</h1>
 
-        {/* Szűrők */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {[
-            { key: 'all', label: 'Összes' },
-            { key: 'pending', label: 'Függőben' },
-            { key: 'confirmed', label: 'Megerősítve' },
-            { key: 'completed', label: 'Teljesítve' },
-            { key: 'cancelled', label: 'Lemondva' },
-          ].map(({ key, label }) => (
+        {/* Filter gombok */}
+        <div className="flex gap-2">
+          {(['all', 'pending', 'confirmed', 'cancelled'] as const).map((f) => (
             <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                filter === key
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                filter === f
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {label}
-              {key !== 'all' && (
-                <span className="ml-1 text-xs opacity-70">
-                  ({bookings.filter((b) => b.status === key).length})
-                </span>
-              )}
+              {f === 'all' ? 'Összes' : statusLabel[f]}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Lista */}
-        <div className="space-y-4">
-          {loading ? (
-            <div className="text-center text-gray-500 py-8">Betöltés...</div>
-          ) : filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow p-8 text-center">
-              <p className="text-gray-500">Nincs foglalás ebben a kategóriában.</p>
-            </div>
-          ) : (
-            filtered.map((booking) => (
-              <div key={booking.id} className="bg-white rounded-2xl shadow p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900 text-lg">{booking.guest_name}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[booking.status]}`}>
-                        {statusLabels[booking.status]}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                      <div>
-                        <p className="text-gray-400">Szolgáltatás</p>
-                        <p className="font-medium text-gray-700">{booking.services?.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Munkatárs</p>
-                        <p className="font-medium text-gray-700">{booking.staff?.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Időpont</p>
-                        <p className="font-medium text-gray-700">{formatDate(booking.starts_at)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Ár</p>
-                        <p className="font-medium text-gray-700">{(booking.total_price / 100).toLocaleString('hu-HU')} Ft</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex gap-4 text-sm text-gray-500">
-                      {booking.guest_email && <span>✉️ {booking.guest_email}</span>}
-                      {booking.guest_phone && <span>📞 {booking.guest_phone}</span>}
-                      {booking.notes && <span>📝 {booking.notes}</span>}
-                    </div>
-                  </div>
-
-                  {/* Státusz műveletek */}
-                  <div className="flex flex-col gap-2 flex-shrink-0">
-                    {booking.status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => updateStatus(booking.id, 'confirmed')}
-                          className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors"
-                        >
-                          ✓ Megerősít
-                        </button>
-                        <button
-                          onClick={() => updateStatus(booking.id, 'cancelled')}
-                          className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium hover:bg-red-100 transition-colors"
-                        >
-                          ✕ Lemondás
-                        </button>
-                      </>
-                    )}
-                    {booking.status === 'confirmed' && (
-                      <button
-                        onClick={() => updateStatus(booking.id, 'completed')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        ✓ Teljesítve
-                      </button>
-                    )}
-                  </div>
+      {loading ? (
+        <div className="text-center py-12 text-gray-400">Betöltés...</div>
+      ) : bookings.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">Nincs foglalás</div>
+      ) : (
+        <div className="space-y-3">
+          {bookings.map((booking) => (
+            <div
+              key={booking.id}
+              className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
+            >
+              {/* Dátum/idő blokk */}
+              <div className="min-w-[120px] text-center bg-gray-50 rounded-lg p-3">
+                <div className="text-sm text-gray-500">
+                  {new Date(booking.booking_date).toLocaleDateString('hu-HU', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </div>
+                <div className="text-lg font-bold text-gray-900">
+                  {booking.start_time?.slice(0, 5)}
                 </div>
               </div>
-            ))
-          )}
+
+              {/* Vendég adatok */}
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900">{booking.guest_name}</div>
+                <div className="text-sm text-gray-500">{booking.guest_email} · {booking.guest_phone}</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  {booking.services?.name} — {booking.staff?.name}
+                </div>
+                {booking.notes && (
+                  <div className="text-xs text-gray-400 mt-1">📝 {booking.notes}</div>
+                )}
+              </div>
+
+              {/* Státusz badge */}
+              <div>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[booking.status]}`}>
+                  {statusLabel[booking.status]}
+                </span>
+              </div>
+
+              {/* Akció gombok */}
+              <div className="flex gap-2">
+                {booking.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => updateStatus(booking.id, 'confirmed')}
+                      disabled={updating === booking.id}
+                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      ✓ Megerősít
+                    </button>
+                    <button
+                      onClick={() => updateStatus(booking.id, 'cancelled')}
+                      disabled={updating === booking.id}
+                      className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
+                    >
+                      ✕ Lemond
+                    </button>
+                  </>
+                )}
+                {booking.status === 'confirmed' && (
+                  <button
+                    onClick={() => updateStatus(booking.id, 'cancelled')}
+                    disabled={updating === booking.id}
+                    className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50 transition-colors"
+                  >
+                    ✕ Lemond
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   )
 }
