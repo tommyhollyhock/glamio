@@ -130,7 +130,7 @@ export default function FoglalasokPage() {
                 <div className="text-sm text-gray-500">
                   {new Date(booking.starts_at).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })}
                 </div>
-                <div className="text-lg font-bold text-gray-900">{booking.starts_at?.slice(0, 5)}</div>
+                <div className="text-lg font-bold text-gray-900">{new Date(booking.starts_at).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900">{booking.guest_name}</div>
