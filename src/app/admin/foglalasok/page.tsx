@@ -72,7 +72,8 @@ export default function FoglalasokPage() {
       query = query.eq('status', filter)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    console.log('BOOKINGS data:', data, 'error:', error)
     setBookings((data as unknown as Booking[]) || [])
     setLoading(false)
   }
