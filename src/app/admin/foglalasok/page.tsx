@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 
 type Booking = {
   id: string
@@ -38,10 +38,7 @@ export default function FoglalasokPage() {
   const [updating, setUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all')
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const fetchBookings = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -72,8 +69,7 @@ export default function FoglalasokPage() {
       query = query.eq('status', filter)
     }
 
-    const { data, error } = await query
-    console.log('BOOKINGS data:', data, 'error:', error)
+    const { data } = await query
     setBookings((data as unknown as Booking[]) || [])
     setLoading(false)
   }
