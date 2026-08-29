@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: Request) {
-  const { guestName, guestEmail, serviceName, staffName, date, time, salonName } = await request.json()
+  const { guestName, guestEmail, cancelToken, serviceName, staffName, date, time, salonName } = await request.json()
 
   try {
     await resend.emails.send({
@@ -40,6 +40,9 @@ export async function POST(request: Request) {
 
           <p style="color: #6b7280; font-size: 14px;">
             Ha kérdésed van, keresd fel a szalont közvetlenül.
+      </p>
+      <p style="color: #6b7280; font-size: 14px;">
+        Ha le szeretnéd mondani a foglalásod: <a href="https://glamio-five.vercel.app/lemondas/${cancelToken}" style="color: #4f46e5;">Foglalás lemondása</a>
           </p>
           
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">

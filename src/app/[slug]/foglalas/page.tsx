@@ -32,7 +32,7 @@ export default function FoglalasPage() {
       setSalonId(data.id)
       supabase.from('services').select('*').eq('salon_id', data.id).eq('is_active', true).order('category').then(({ data: s }) => setServices(s || []))
       supabase.from('staff').select('*').eq('salon_id', data.id).eq('is_active', true).order('name').then(({ data: st }) => setStaff(st || []))
-    })
+    }).select('cancel_token').single()
   }, [slug])
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function FoglalasPage() {
       date,
       duration: sel.duration_min.toString(),
       ...(selStaff ? { staff_id: selStaff.id } : {})
-    })
+    }).select('cancel_token').single()
     fetch(`/api/slots?${params}`)
       .then(r => r.json())
       .then(data => setAvailableSlots(data.slots || []))
@@ -55,12 +55,12 @@ export default function FoglalasPage() {
     setLoading(true)
     const start = new Date(`${date}T${time}:00`)
     const end = new Date(start.getTime() + sel.duration_min * 60000)
-    await supabase.from('bookings').insert({
+    const { data: newBooking } = await supabase.from('bookings').insert({
       salon_id: salonId, staff_id: selStaff?.id || staff[0]?.id,
       service_id: sel.id, guest_name: name, guest_email: email,
       guest_phone: phone, notes, starts_at: start.toISOString(),
       ends_at: end.toISOString(), total_price: sel.price, status: 'pending'
-    })
+    }).select('cancel_token').single()
     setLoading(false)
         await fetch('/api/send-confirmation', {
       method: 'POST',
@@ -68,13 +68,14 @@ export default function FoglalasPage() {
       body: JSON.stringify({
         guestName: name,
         guestEmail: email,
+        cancelToken: newBooking?.cancel_token,
         serviceName: sel.name,
         staffName: selStaff?.name,
         date,
         time,
         salonName: slug,
-      }),
-        })
+      }).select('cancel_token').single(),
+        }).select('cancel_token').single()
     setDone(true)
   }
   if (done) return (
