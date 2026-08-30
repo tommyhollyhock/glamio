@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -36,7 +36,7 @@ const statusLabel: Record<string, { text: string; color: string }> = {
   canceled: { text: 'Előfizetés lejárt', color: 'bg-gray-50 text-gray-700 border-gray-200' },
 }
 
-export default function BeallitasokPage() {
+function BeallitasokContent() {
   const [salon, setSalon] = useState<SalonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -123,7 +123,6 @@ export default function BeallitasokPage() {
         </div>
       )}
 
-      {/* Előfizetés szekció */}
       <div className="bg-white rounded-2xl shadow p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Előfizetés</h2>
         <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${status.color} mb-3`}>
@@ -133,11 +132,7 @@ export default function BeallitasokPage() {
           <p className="text-sm text-gray-500 mb-4">Próbaidőszak vége: <strong>{trialEnd}</strong></p>
         )}
         {['trialing', 'past_due', 'canceled'].includes(salon.subscription_status) && (
-          <button
-            onClick={handleSubscribe}
-            disabled={subscribing}
-            className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
+          <button onClick={handleSubscribe} disabled={subscribing} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
             {subscribing ? 'Átirányítás...' : salon.subscription_status === 'trialing' ? 'Előfizetés aktiválása' : 'Előfizetés megújítása'}
           </button>
         )}
@@ -146,7 +141,6 @@ export default function BeallitasokPage() {
         )}
       </div>
 
-      {/* Szalon adatok */}
       <div className="bg-white rounded-2xl shadow p-6 space-y-5">
         <div><label className="block text-sm font-medium text-gray-700 mb-1">Szalon neve</label><input type="text" value={salon.name} onChange={(e) => updateField('name', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" /></div>
         <div><label className="block text-sm font-medium text-gray-700 mb-1">URL slug</label><div className="flex items-center gap-2"><span className="text-sm text-gray-400">glamio.hu/</span><input type="text" value={salon.slug} onChange={(e) => updateField('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" /></div></div>
@@ -161,5 +155,13 @@ export default function BeallitasokPage() {
         <button onClick={handleSave} disabled={saving} className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">{saving ? 'Mentés...' : 'Beállítások mentése'}</button>
       </div>
     </div>
+  )
+}
+
+export default function BeallitasokPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center text-gray-400">Betöltés...</div>}>
+      <BeallitasokContent />
+    </Suspense>
   )
 }
