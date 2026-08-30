@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type SalonData = {
@@ -15,6 +16,8 @@ type SalonData = {
   address: { city?: string; street?: string; zip?: string }
   logo_url: string
   cover_url: string
+  subscription_status: string
+  trial_ends_at: string | null
 }
 
 const salonTypes = [
@@ -26,20 +29,54 @@ const salonTypes = [
   { value: 'other', label: 'Egyéb' },
 ]
 
+const statusLabel: Record<string, { text: string; color: string }> = {
+  trialing: { text: 'Ingyenes próbaidőszak', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  active: { text: 'Aktív előfizetés', color: 'bg-green-50 text-green-700 border-green-200' },
+  past_due: { text: 'Fizetési hiba', color: 'bg-red-50 text-red-700 border-red-200' },
+  canceled: { text: 'Előfizetés lejárt', color: 'bg-gray-50 text-gray-700 border-gray-200' },
+}
+
 export default function BeallitasokPage() {
   const [salon, setSalon] = useState<SalonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      setMessage({ type: 'success', text: 'Előfizetés sikeresen aktiválva!' })
+      setTimeout(() => setMessage(null), 5000)
+    }
+    if (searchParams.get('canceled') === 'true') {
+      setMessage({ type: 'error', text: 'Előfizetés megszakítva.' })
+      setTimeout(() => setMessage(null), 3000)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const fetchSalon = async () => {
       const { data: profile } = await supabase.from('profiles').select('salon_id').single()
       if (!profile?.salon_id) return
-      const { data } = await supabase.from('salons').select('id, name, slug, type, phone, email, address, logo_url, cover_url').eq('id', profile.salon_id).single()
+      const { data } = await supabase
+        .from('salons')
+        .select('id, name, slug, type, phone, email, address, logo_url, cover_url, subscription_status, trial_ends_at')
+        .eq('id', profile.salon_id)
+        .single()
       if (data) {
-        setSalon({ ...data, phone: data.phone || '', email: data.email || '', type: data.type || 'beauty', address: data.address || { city: '', street: '', zip: '' }, logo_url: data.logo_url || '', cover_url: data.cover_url || '' })
+        setSalon({
+          ...data,
+          phone: data.phone || '',
+          email: data.email || '',
+          type: data.type || 'beauty',
+          address: data.address || { city: '', street: '', zip: '' },
+          logo_url: data.logo_url || '',
+          cover_url: data.cover_url || '',
+          subscription_status: data.subscription_status || 'trialing',
+          trial_ends_at: data.trial_ends_at || null,
+        })
       }
       setLoading(false)
     }
@@ -50,9 +87,21 @@ export default function BeallitasokPage() {
     if (!salon) return
     setSaving(true)
     setMessage(null)
-    const { error } = await supabase.from('salons').update({ name: salon.name, slug: salon.slug, type: salon.type, phone: salon.phone, email: salon.email, address: salon.address, logo_url: salon.logo_url, cover_url: salon.cover_url }).eq('id', salon.id)
-    if (error) { setMessage({ type: 'error', text: 'Hiba: ' + error.message }) } else { setMessage({ type: 'success', text: 'Beállítások mentve!' }); setTimeout(() => setMessage(null), 3000) }
+    const { error } = await supabase
+      .from('salons')
+      .update({ name: salon.name, slug: salon.slug, type: salon.type, phone: salon.phone, email: salon.email, address: salon.address, logo_url: salon.logo_url, cover_url: salon.cover_url })
+      .eq('id', salon.id)
+    if (error) { setMessage({ type: 'error', text: 'Hiba: ' + error.message }) }
+    else { setMessage({ type: 'success', text: 'Beállítások mentve!' }); setTimeout(() => setMessage(null), 3000) }
     setSaving(false)
+  }
+
+  const handleSubscribe = async () => {
+    setSubscribing(true)
+    const res = await fetch('/api/stripe/create-checkout', { method: 'POST' })
+    const data = await res.json()
+    if (data.url) { window.location.href = data.url }
+    else { setMessage({ type: 'error', text: 'Hiba a fizetési oldal megnyitásakor.' }); setSubscribing(false) }
   }
 
   const updateField = (field: keyof SalonData, value: string) => { if (!salon) return; setSalon({ ...salon, [field]: value }) }
@@ -61,10 +110,43 @@ export default function BeallitasokPage() {
   if (loading) return <div className="p-6 text-center text-gray-400">Betöltés...</div>
   if (!salon) return <div className="p-6 text-center text-red-500">Szalon nem található</div>
 
+  const status = statusLabel[salon.subscription_status] || statusLabel['canceled']
+  const trialEnd = salon.trial_ends_at ? new Date(salon.trial_ends_at).toLocaleDateString('hu-HU') : null
+
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Szalon beállítások</h1>
-      {message && (<div className={`mb-4 p-3 rounded-lg text-sm font-medium ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{message.text}</div>)}
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg text-sm font-medium border ${message.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+          {message.text}
+        </div>
+      )}
+
+      {/* Előfizetés szekció */}
+      <div className="bg-white rounded-2xl shadow p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Előfizetés</h2>
+        <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${status.color} mb-3`}>
+          {status.text}
+        </div>
+        {trialEnd && salon.subscription_status === 'trialing' && (
+          <p className="text-sm text-gray-500 mb-4">Próbaidőszak vége: <strong>{trialEnd}</strong></p>
+        )}
+        {['trialing', 'past_due', 'canceled'].includes(salon.subscription_status) && (
+          <button
+            onClick={handleSubscribe}
+            disabled={subscribing}
+            className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            {subscribing ? 'Átirányítás...' : salon.subscription_status === 'trialing' ? 'Előfizetés aktiválása' : 'Előfizetés megújítása'}
+          </button>
+        )}
+        {salon.subscription_status === 'active' && (
+          <p className="text-sm text-green-600 font-medium">✓ Az előfizetésed aktív</p>
+        )}
+      </div>
+
+      {/* Szalon adatok */}
       <div className="bg-white rounded-2xl shadow p-6 space-y-5">
         <div><label className="block text-sm font-medium text-gray-700 mb-1">Szalon neve</label><input type="text" value={salon.name} onChange={(e) => updateField('name', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" /></div>
         <div><label className="block text-sm font-medium text-gray-700 mb-1">URL slug</label><div className="flex items-center gap-2"><span className="text-sm text-gray-400">glamio.hu/</span><input type="text" value={salon.slug} onChange={(e) => updateField('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" /></div></div>
