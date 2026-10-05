@@ -10,8 +10,7 @@ const navItems = [
   { href: '/admin/foglalasok', label: 'Foglalások', icon: '📅' },
   { href: '/admin/staff', label: 'Munkatársak', icon: '👥' },
   { href: '/admin/szolgaltatasok', label: 'Szolgáltatások', icon: '✂️' },
-  { href: '/admin/munkaidо-beallitas', label: 'Munkaidő', icon: '⏰' },
-  { href: '/admin/ertekelesek', label: 'Értékelések', icon: '⭐' },
+  { href: '/admin/munkaido-beallitas', label: 'Munkaidő', icon: '⏰' },
   { href: '/admin/beallitasok', label: 'Beállítások', icon: '⚙️' },
 ]
 
