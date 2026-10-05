@@ -1,9 +1,10 @@
 import { Resend } from 'resend'
 import { NextResponse } from 'next/server'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
   const { guestName, guestEmail, cancelToken, serviceName, staffName, date, time, salonName } = await request.json()
 
   try {
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Email küldés sikertelen' }, { status: 500 })
   }
 }
